@@ -45,11 +45,43 @@
             "description": ""
         },
         {
-            "name": "classification",
+            "name": "number of returns",
             "size": 1,
             "elements": 1,
             "elementSize": 1,
             "type": "uint8",
+            "description": ""
+        },
+        {
+            "name": "return number",
+            "size": 1,
+            "elements": 1,
+            "elementSize": 1,
+            "type": "uint8",
+            "description": ""
+        },
+        {
+            "name": "NormalX",
+            "size": 8,
+            "elements": 1,
+            "elementSize": 8,
+            "type": "double",
+            "description": ""
+        },
+        {
+            "name": "NormalY",
+            "size": 8,
+            "elements": 1,
+            "elementSize": 8,
+            "type": "double",
+            "description": ""
+        },
+        {
+            "name": "NormalZ",
+            "size": 8,
+            "elements": 1,
+            "elementSize": 8,
+            "type": "double",
             "description": ""
         }
     ],
