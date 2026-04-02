@@ -12,17 +12,6 @@
   <link rel="stylesheet" href="./libs/openlayers3/ol.css">
   <link rel="stylesheet" href="./libs/spectrum/spectrum.css">
   <link rel="stylesheet" href="./libs/jstree/themes/mixed/style.css">
-
-  <style>
-    #vr_button_container{
-      position:absolute;
-      z-index:10000;
-      left:50%;
-      bottom:20px;
-      transform:translateX(-50%);
-      pointer-events:auto;
-    }
-  </style>
 </head>
 
 <body>
@@ -32,7 +21,6 @@
          style="background-image:url('./build/potree/resources/images/NUOVO_LOGO_FAI.jpg');">
     </div>
     <div id="potree_sidebar_container"></div>
-    <div id="vr_button_container"></div>
   </div>
 
   <script src="./libs/jquery/jquery-3.1.1.min.js"></script>
@@ -48,9 +36,7 @@
   <script src="./libs/plasio/js/laslaz.js"></script>
   <script src="./build/potree/potree.js"></script>
 
-  <script type="module">
-    import { VRButton } from "./libs/three.js/webxr/VRButton.js";
-
+  <script>
     window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
 
     viewer.setEDLEnabled(true);
@@ -164,14 +150,11 @@
       });
     }
 
-    let xrPointCloud = null;
-
     Potree.loadPointCloud(
       "pointclouds/parco_dei_monaci/cloud.js",
       "Parco dei Monaci - PointCloud",
       function (e) {
         const pc = e.pointcloud;
-        xrPointCloud = pc;
         const mat = pc.material;
 
         mat.activeAttributeName = "rgba";
@@ -185,208 +168,6 @@
         addPointSizeSliderToAppearance(mat);
       }
     );
-
-    let edlBeforeXR = true;
-
-    const xrControllers = { left: null, right: null };
-    const xrGamepads = { left: null, right: null };
-
-    const xrMoveState = {
-      forward: 0,
-      strafe: 0
-    };
-
-    const xrTurnState = {
-      canSnap: true
-    };
-
-    const XR_MOVE_SPEED = 0.06;
-    const XR_DEADZONE = 0.15;
-    const XR_SNAP_THRESHOLD = 0.7;
-    const XR_SNAP_ANGLE = Math.PI / 8;
-
-    function getPotreeRenderer() {
-      return viewer.renderer || viewer.pRenderer?.renderer || null;
-    }
-
-    function applyDeadzone(value, deadzone = XR_DEADZONE) {
-      return Math.abs(value) < deadzone ? 0 : value;
-    }
-
-    function registerXRController(controller) {
-      controller.addEventListener("connected", (event) => {
-        const handedness = event.data.handedness || "none";
-        const gamepad = event.data.gamepad || null;
-
-        if (handedness === "left" || handedness === "right") {
-          xrControllers[handedness] = controller;
-          xrGamepads[handedness] = gamepad;
-          console.log(`XR controller connected: ${handedness}`);
-        }
-      });
-
-      controller.addEventListener("disconnected", () => {
-        for (const hand of ["left", "right"]) {
-          if (xrControllers[hand] === controller) {
-            xrControllers[hand] = null;
-            xrGamepads[hand] = null;
-            console.log(`XR controller disconnected: ${hand}`);
-          }
-        }
-      });
-    }
-
-    function getCameraForwardOnGround(camera) {
-      const dir = new THREE.Vector3();
-      camera.getWorldDirection(dir);
-      dir.y = 0;
-
-      if (dir.lengthSq() === 0) {
-        return new THREE.Vector3(0, 0, -1);
-      }
-
-      return dir.normalize();
-    }
-
-    function getCameraRightOnGround(camera) {
-      const forward = getCameraForwardOnGround(camera);
-      return new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    }
-
-    function updateXRThumbsticks() {
-      const leftGp = xrGamepads.left;
-      const rightGp = xrGamepads.right;
-
-      xrMoveState.forward = 0;
-      xrMoveState.strafe = 0;
-
-      if (leftGp && leftGp.axes && leftGp.axes.length >= 2) {
-        xrMoveState.strafe = applyDeadzone(leftGp.axes[0]);
-        xrMoveState.forward = applyDeadzone(leftGp.axes[1]);
-      }
-
-      if (rightGp && rightGp.axes && rightGp.axes.length >= 2) {
-        const turnX = applyDeadzone(rightGp.axes[0]);
-
-        if (xrTurnState.canSnap) {
-          if (turnX >= XR_SNAP_THRESHOLD) {
-            viewer.scene.view.yaw -= XR_SNAP_ANGLE;
-            xrTurnState.canSnap = false;
-          } else if (turnX <= -XR_SNAP_THRESHOLD) {
-            viewer.scene.view.yaw += XR_SNAP_ANGLE;
-            xrTurnState.canSnap = false;
-          }
-        }
-
-        if (Math.abs(turnX) < 0.2) {
-          xrTurnState.canSnap = true;
-        }
-      }
-    }
-
-    function moveViewerInXR() {
-      const camera = viewer.scene.getActiveCamera();
-      if (!camera) return;
-
-      const forward = getCameraForwardOnGround(camera);
-      const right = getCameraRightOnGround(camera);
-
-      const moveForward = -xrMoveState.forward;
-      const moveStrafe = xrMoveState.strafe;
-
-      const move = new THREE.Vector3();
-      move.add(forward.multiplyScalar(moveForward * XR_MOVE_SPEED));
-      move.add(right.multiplyScalar(moveStrafe * XR_MOVE_SPEED));
-
-      viewer.scene.view.position.add(move);
-    }
-
-    function setupWebXR() {
-      const renderer = getPotreeRenderer();
-
-      if (!renderer) {
-        console.warn("WebXR: renderer Potree non trovato.");
-        return;
-      }
-
-      if (!renderer.xr) {
-        console.warn("WebXR: renderer.xr non disponibile.");
-        return;
-      }
-
-      renderer.xr.enabled = true;
-
-      if (renderer.xr.setReferenceSpaceType) {
-        renderer.xr.setReferenceSpaceType("local");
-      }
-
-      const controller0 = renderer.xr.getController(0);
-      const controller1 = renderer.xr.getController(1);
-
-      registerXRController(controller0);
-      registerXRController(controller1);
-
-      renderer.xr.addEventListener("sessionstart", () => {
-        edlBeforeXR = viewer.useEDL;
-        viewer.setEDLEnabled(false);
-
-        if (xrPointCloud) {
-          xrPointCloud.rotation.x = -Math.PI / 2;
-          xrPointCloud.updateMatrixWorld(true);
-        }
-
-        console.log("WebXR session started: EDL temporarily disabled, XR rotation applied.");
-      });
-
-      renderer.xr.addEventListener("sessionend", () => {
-        viewer.setEDLEnabled(edlBeforeXR);
-
-        if (xrPointCloud) {
-          xrPointCloud.rotation.x = 0;
-          xrPointCloud.updateMatrixWorld(true);
-        }
-
-        xrControllers.left = null;
-        xrControllers.right = null;
-        xrGamepads.left = null;
-        xrGamepads.right = null;
-
-        console.log("WebXR session ended: EDL restored, XR rotation removed.");
-      });
-
-      const vrButton = VRButton.createButton(renderer);
-      document.getElementById("vr_button_container").appendChild(vrButton);
-    }
-
-    function waitForRendererAndSetupXR(retries = 50) {
-      const renderer = getPotreeRenderer();
-
-      if (renderer) {
-        setupWebXR();
-        return;
-      }
-
-      if (retries > 0) {
-        setTimeout(() => waitForRendererAndSetupXR(retries - 1), 200);
-      } else {
-        console.warn("WebXR: impossibile inizializzare il renderer Potree.");
-      }
-    }
-
-    waitForRendererAndSetupXR();
-
-    function xrControlLoop() {
-      const renderer = getPotreeRenderer();
-
-      if (renderer && renderer.xr && renderer.xr.isPresenting) {
-        updateXRThumbsticks();
-        moveViewerInXR();
-      }
-
-      requestAnimationFrame(xrControlLoop);
-    }
-
-    xrControlLoop();
   </script>
 
 </body>
