@@ -12,6 +12,16 @@
   <link rel="stylesheet" href="./libs/openlayers3/ol.css">
   <link rel="stylesheet" href="./libs/spectrum/spectrum.css">
   <link rel="stylesheet" href="./libs/jstree/themes/mixed/style.css">
+
+  <style>
+    #vr_button_container{
+      position:absolute;
+      z-index:10000;
+      right:20px;
+      bottom:20px;
+      pointer-events:auto;
+    }
+  </style>
 </head>
 
 <body>
@@ -21,6 +31,7 @@
          style="background-image:url('./build/potree/resources/images/NUOVO_LOGO_FAI.jpg');">
     </div>
     <div id="potree_sidebar_container"></div>
+    <div id="vr_button_container"></div>
   </div>
 
   <script src="./libs/jquery/jquery-3.1.1.min.js"></script>
@@ -36,7 +47,9 @@
   <script src="./libs/plasio/js/laslaz.js"></script>
   <script src="./build/potree/potree.js"></script>
 
-  <script>
+  <script type="module">
+    import { VRButton } from "./libs/three.js/webxr/VRButton.js";
+
     window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
 
     viewer.setEDLEnabled(true);
@@ -168,6 +181,67 @@
         addPointSizeSliderToAppearance(mat);
       }
     );
+
+    // -----------------------------
+    // WEBXR / VR
+    // -----------------------------
+    let edlBeforeXR = true;
+
+    function getPotreeRenderer() {
+      return viewer.renderer || viewer.pRenderer?.renderer || null;
+    }
+
+    function setupWebXR() {
+      const renderer = getPotreeRenderer();
+
+      if (!renderer) {
+        console.warn("WebXR: renderer Potree non trovato.");
+        return;
+      }
+
+      if (!renderer.xr) {
+        console.warn("WebXR: renderer.xr non disponibile.");
+        return;
+      }
+
+      renderer.xr.enabled = true;
+
+      if (renderer.xr.setReferenceSpaceType) {
+        renderer.xr.setReferenceSpaceType("local");
+      }
+
+      renderer.xr.addEventListener("sessionstart", () => {
+        edlBeforeXR = viewer.useEDL;
+        viewer.setEDLEnabled(false);
+        console.log("WebXR session started: EDL temporarily disabled.");
+      });
+
+      renderer.xr.addEventListener("sessionend", () => {
+        viewer.setEDLEnabled(edlBeforeXR);
+        console.log("WebXR session ended: EDL restored.");
+      });
+
+      const vrButton = VRButton.createButton(renderer);
+      document.getElementById("vr_button_container").appendChild(vrButton);
+    }
+
+    // Aspetta che Potree abbia inizializzato il renderer
+    function waitForRendererAndSetupXR(retries = 50) {
+      const renderer = getPotreeRenderer();
+
+      if (renderer) {
+        setupWebXR();
+        return;
+      }
+
+      if (retries > 0) {
+        setTimeout(() => waitForRendererAndSetupXR(retries - 1), 200);
+      } else {
+        console.warn("WebXR: impossibile inizializzare il renderer Potree.");
+      }
+    }
+
+    waitForRendererAndSetupXR();
   </script>
 
 </body>
